@@ -1,3 +1,4 @@
+import hashlib
 import os
 import sys
 import shutil
@@ -6,7 +7,9 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from bs4 import Tag
+from socket import error as SocketError
 import json
+import threading
 
 
 def create_users_directory(username):
@@ -32,7 +35,7 @@ def get_page_posts(username, page, session=requests):
 
     # content = soup.find('div', id='content')
     # posts = soup.findall('div', re.compile(".*"))
-    posts = soup.find_all(class_='post')
+    posts = soup.find_all(class_=re.compile('.*post.*'))
     return posts
 
 
@@ -50,10 +53,15 @@ def download_images(user_dir, images, session=requests):
     paths=[]
     for image in images:
         print 'Downloading Image: %s' % image['src']
-
+        url=image["src"]
         #try to click down and get highest quality image
         try:
-            r = session.get(image.parent["href"])
+            parent = image.parent
+            while parent is not None and not parent.has_attr("href"):
+                parent = parent.parent
+
+            href = parent["href"]
+            r = session.get(href)
             if r.status_code != 200:
                 print 'Got status code %s' % r.status_code
 
@@ -62,20 +70,34 @@ def download_images(user_dir, images, session=requests):
 
             # content = soup.find('div', id='content')
             # posts = soup.findall('div', re.compile(".*"))
-            url = soup.find(id='content-image')["src"]
+            img = soup.find(id='content-image')
+            if img is not None:
+                url = img["data-src"]
+                if url is  None:
+                    url = img["src"]
         except:
+            # this has to pass so we can fall back to not big images, if an exception occurs for another reason
+            # handle it but not here
             pass
 
-        url = image['src']
         filename = url.split('/')[-1]
 
         image_path = os.path.join(user_dir, 'img',filename)
+
+        #not a tumblr image, we might have crossed a site boundary.
+        if not str(filename).startswith("tumblr"):
+            continue;
+
         paths.append(image_path)
         if os.path.isfile(image_path):
             continue
-        r = session.get(url, stream=True)
-        with open(image_path, 'wb') as out_file:
-            shutil.copyfileobj(r.raw, out_file)
+
+        try:
+            r = session.get(url, stream=True)
+            with open(image_path, 'wb') as out_file:
+                shutil.copyfileobj(r.raw, out_file)
+        except:
+            continue
 
     return paths
 
@@ -123,32 +145,11 @@ def main():
         posts = get_page_posts(username, page, session)
         while (len(posts) >0):
             for p in posts:
-                pid = getPostID(p)
 
-                #not a real post just using that classname for formatting
-                if pid == None:
-                    continue
+                success = False
+                while not success:
+                    success = grab_post(p, postDict, session, success, user_dir)
 
-                images = imagesInPost(p)
-                tags = tagsInPost(p)
-
-                if not postDict.has_key(pid):
-                    postDict[pid]={}
-                    postDict[pid]["tags"]= []
-                    postDict[pid]["images"] = []
-                    postDict[pid]["text"] = ""
-
-                postDict[pid]["tags"]=set(postDict[pid]["tags"])
-                for t in tags:
-                    if isinstance(t,Tag):
-                        tagString= t.getText().replace("#","")
-                        postDict[pid]["tags"].add(tagString)
-
-
-                images = imagesInPost(p)
-                postDict[pid]["images"] = map(os.path.basename,download_images(user_dir,images,session))
-                postDict[pid]["tags"] = list(postDict[pid]["tags"])
-                postDict[pid]["text"]= str(p)
             page += 1
             posts = get_page_posts(username, page, session)
         json.dump(postDict,fd)
@@ -156,6 +157,41 @@ def main():
     except KeyboardInterrupt:
         json.dump(postDict, fd)
         fd.close()
+
+
+def grab_post(p, postDict, session, success, user_dir):
+    try:
+        pid = getPostID(p)
+
+        if pid == None:
+            m = hashlib.md5()
+            m.update(str(p))
+            pid = "__md5" + m.hexdigest()
+
+        tags = tagsInPost(p)
+
+        if not postDict.has_key(pid):
+            postDict[pid] = {}
+            postDict[pid]["tags"] = []
+            postDict[pid]["images"] = []
+            postDict[pid]["text"] = ""
+
+        postDict[pid]["tags"] = set(postDict[pid]["tags"])
+        for t in tags:
+            if isinstance(t, Tag):
+                tagString = t.getText().replace("#", "")
+                postDict[pid]["tags"].add(tagString)
+
+        images = imagesInPost(p)
+        longImagePaths = download_images(user_dir, images, session)
+        postDict[pid]["images"] = map(os.path.basename, longImagePaths)
+        postDict[pid]["tags"] = list(postDict[pid]["tags"])
+        postDict[pid]["text"] = str(p)
+        success = True
+    except SocketError:
+        success = False
+        threading.sleep(10);
+    return success
 
 
 if __name__ == '__main__':
