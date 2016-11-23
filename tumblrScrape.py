@@ -10,6 +10,8 @@ from bs4 import Tag
 from socket import error as SocketError
 import json
 import threading
+import  random
+import time
 
 
 def create_users_directory(username):
@@ -49,9 +51,16 @@ def tagsInPost(p):
     tags.append(p.find_all(id=re.compile("tag.*")))
     return tags
 
+
+
 def download_images(user_dir, images, session=requests):
     paths=[]
+    # throttle
+    time.sleep(random.randrange(0, 1000) / 500.0)
     for image in images:
+
+
+
         print 'Downloading Image: %s' % image['src']
         url=image["src"]
         #try to click down and get highest quality image
@@ -89,15 +98,38 @@ def download_images(user_dir, images, session=requests):
             continue;
 
         paths.append(image_path)
-        if os.path.isfile(image_path):
-            continue
+        if not os.path.isfile(image_path):
+            try:
+                r = session.get(url, stream=True)
+                with open(image_path, 'wb') as out_file:
+                    shutil.copyfileobj(r.raw, out_file)
+                    out_file.close()
+            except:
+                continue
 
-        try:
-            r = session.get(url, stream=True)
-            with open(image_path, 'wb') as out_file:
-                shutil.copyfileobj(r.raw, out_file)
-        except:
-            continue
+
+        #Try to get higher res
+        filename = url.split('/')[-1]
+
+        suffix = url.split("_")[-1];
+        extension = suffix.split(".")[-1];
+        highResUrl= url.replace(suffix,"1280."+extension)
+        highResFilename = filename.replace(suffix,"1280."+extension)
+        image_path = os.path.join(user_dir, 'img', highResFilename)
+
+        if not os.path.isfile(highResFilename):
+            print 'Trying for 1280: ' +highResUrl
+            try:
+                r = session.get(highResUrl, stream=True)
+                with open(image_path, 'wb') as out_file:
+                    shutil.copyfileobj(r.raw, out_file)
+                    out_file.close()
+                if r.status_code != 200:
+                    print 'Got status code %s' % r.status_code
+            except:
+                continue
+
+
 
     return paths
 
@@ -142,8 +174,16 @@ def main():
             fd.close()
         fd = open(postPath, "w")
 
+        MAX_GET_POST_ATTEMPT=30;
+        getPostsAttempt=1;
         posts = get_page_posts(username, page, session)
-        while (len(posts) >0):
+        while (getPostsAttempt < MAX_GET_POST_ATTEMPT):
+
+            if len(posts) < 1:
+                getPostsAttempt+=1
+            else:
+                getPostsAttempt=0;
+
             for p in posts:
 
                 success = False
@@ -152,6 +192,10 @@ def main():
 
             page += 1
             posts = get_page_posts(username, page, session)
+
+        if getPostsAttempt >= MAX_GET_POST_ATTEMPT:
+            print ">>Stopped because no posts after %d attempts<<" % getPostsAttempt;
+
         json.dump(postDict,fd)
         fd.close()
     except KeyboardInterrupt:
