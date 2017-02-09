@@ -12,5 +12,6 @@ onlyfiles = [f for f in listdir(dataDir) if os.path.isdir(os.path.join(dataDir, 
 onlyfiles = filter(lambda (x): not os.path.basename(x).startswith("."),onlyfiles)
 
 for f in onlyfiles:
+    print "Updating..."+f
     sys.argv = ['tumblrScrape.py',f]
     execfile('tumblrScrape.py')
