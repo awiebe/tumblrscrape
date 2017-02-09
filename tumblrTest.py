@@ -31,6 +31,7 @@ class TumblrSlurp:
         self.throttleHour=now.time().hour;
         self.throttleDailyRequests=0;
         self.throttleHourlyRequests = 0;
+        self.dlRoot=""
 
     def discover_user(self,user):
         self.discovered_users.append(user);
@@ -152,6 +153,9 @@ class TumblrSlurp:
         for c in hashstr:
             a.append(c)
         return os.path.join(*a)
+
+    def setDLRoot(self,path):
+        self.dlRoot=path
 
 
 
