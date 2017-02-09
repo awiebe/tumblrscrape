@@ -1,0 +1,14 @@
+[database]
+dbuser: "root"
+dbpassword: ""
+dbname: ""
+
+[downloads]
+dlroot:"data"
+
+[tumblrSettings]
+
+apiKey:""
+
+dailyThrottle:5000
+hourlyHTrottle:250
