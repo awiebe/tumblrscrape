@@ -5,24 +5,26 @@ import datetime
 import time
 import posixpath
 import os.path
+import configparser
+
 global str
 
 from tumblrTools import TumblrDB,TumblrPost
 
 
-client = pytumblr.TumblrRestClient(
-)
+
 
 # Make the request
 class TumblrSlurp:
 
 
 
-    def __init__(self,db):
+    def __init__(self,db,client):
         self.discovered_users={};
         self.visited_users = [];
         assert(isinstance(db,TumblrDB))
         self.db=db;
+        self.client = client
 
         now = datetime.datetime.now()
         self.throttleDay=now.timetuple().tm_yday
@@ -64,7 +66,7 @@ class TumblrSlurp:
         done = False
         while len(posts) >0 and not done:
 
-            data = client.posts(user,offset=i,type='photo');
+            data = self.client.posts(user,offset=i,type='photo');
             blogMeta = data['blog'];
             postCount = data['total_posts'];
             posts = data['posts'];
@@ -155,8 +157,23 @@ class TumblrSlurp:
 
 
 
-db = TumblrDB()
-s = TumblrSlurp(db)
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+dbname= config['database']['dbname']
+dbpasswd = config['database']['dbpassword']
+dbhost = config['database']['dbhost']
+dbuser = config['database']['dbuser']
+
+
+apikey = config['tumblrSettings']['apikey']
+
+db = TumblrDB(dbhost,dbuser,dbname,dbpasswd)
+
+client = pytumblr.TumblrRestClient(apikey)
+s = TumblrSlurp(db,client)
+s.setDlRoot(config['downloads']['dlroot'])
+
 
 s.slurp("")
 

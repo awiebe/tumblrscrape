@@ -38,10 +38,10 @@ class TumblrDB:
     associate_file_sql = ("INSERT IGNORE INTO POST_FILE(post_id,file_id) VALUES (%s, %s)")
 
 
-    def __init__(self):
+    def __init__(self,host,user,dbname,password=''):
         # note autocommit off by default
-        self.cnx = mysql.connector.connect(host="raspberrypi.local", user='root', database='autotumbl',
-                                           password='')
+        self.cnx = mysql.connector.connect(host=host, user=user, database=dbname,
+                                           password=password)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.cnx.close();
