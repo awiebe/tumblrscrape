@@ -32,6 +32,7 @@ class TumblrSlurp:
         self.throttleDailyRequests=0;
         self.throttleHourlyRequests = 0;
         self.dlRoot=""
+        self.dirprefixlen=5;
 
     def discover_user(self,user):
         self.discovered_users.append(user);
@@ -149,6 +150,9 @@ class TumblrSlurp:
 
     def local_path_for_file(self,path):
         hashstr = os.path.basename(path).split("_")[1]
+
+        #No point in putting files in individal directories, so sort only as deep by truncating hash
+        hashstr = (hashstr[:self.dirprefixlen] + '..') if len(hashstr) > self.dirprefixlen else hashstr
         a=[]
         for c in hashstr:
             a.append(c)
@@ -156,6 +160,10 @@ class TumblrSlurp:
 
     def setDLRoot(self,path):
         self.dlRoot=path
+    def setDirectoryPrefixLength(self,i):
+        if self.i == None:
+            return
+        self.dirprefixlen=i
 
 
 
@@ -170,6 +178,7 @@ dbhost = config['database']['dbhost']
 dbuser = config['database']['dbuser']
 
 
+
 apikey = config['tumblrSettings']['apikey']
 
 db = TumblrDB(dbhost,dbuser,dbname,dbpasswd)
@@ -177,6 +186,7 @@ db = TumblrDB(dbhost,dbuser,dbname,dbpasswd)
 client = pytumblr.TumblrRestClient(apikey)
 s = TumblrSlurp(db,client)
 s.setDlRoot(config['downloads']['dlroot'])
+s.setDirectoryPrefixLength(config['downloads']['dirdepth']);
 
 
 s.slurp("")
