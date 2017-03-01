@@ -6,6 +6,7 @@ import time
 import posixpath
 import os.path
 import configparser
+import sys
 
 global str
 
@@ -168,7 +169,6 @@ class TumblrSlurp:
 
 
 
-
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -188,8 +188,6 @@ s = TumblrSlurp(db,client)
 s.setDlRoot(config['downloads']['dlroot'])
 s.setDirectoryPrefixLength(config['downloads']['dirdepth']);
 
-
-s.slurp("")
-
+s.slurp(sys.argv[1])
 
 #print str(s.discovered_users)
